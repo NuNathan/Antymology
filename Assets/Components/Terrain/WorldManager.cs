@@ -84,11 +84,49 @@ namespace Antymology.Terrain
         }
 
         /// <summary>
-        /// TO BE IMPLEMENTED BY YOU
+        /// Generates ants in the world at a valid spawn position.
         /// </summary>
         private void GenerateAnts()
         {
-            throw new NotImplementedException();
+            if (antPrefab == null)
+                return;
+
+            // Find a valid spawn position (on top of a solid block)
+            Vector3 spawnPosition = FindValidSpawnPosition();
+
+            if (spawnPosition != Vector3.zero)
+            {
+                // Instantiate the ant at the spawn position
+                GameObject ant = Instantiate(antPrefab, spawnPosition, Quaternion.identity);
+                ant.transform.position = spawnPosition;
+            }
+        }
+
+        /// <summary>
+        /// Finds a valid spawn position on top of a solid block.
+        /// </summary>
+        private Vector3 FindValidSpawnPosition()
+        {
+            // Try to find a solid block near the center of the world
+            int centerX = Blocks.GetLength(0) / 2;
+            int centerZ = Blocks.GetLength(2) / 2;
+
+            // Search from top to bottom for the first solid block
+            for (int y = Blocks.GetLength(1) - 1; y >= 0; y--)
+            {
+                AbstractBlock block = Blocks[centerX, y, centerZ];
+
+                // Check if this is a solid block (not air)
+                if (block != null && !(block is AirBlock))
+                {
+                    // Spawn 2 units above the solid block
+                    // The raycast system will snap the ant to the ground
+                    Vector3 spawnPos = new Vector3(centerX + 0.5f, y + 2f, centerZ + 0.5f);
+                    return spawnPos;
+                }
+            }
+
+            return Vector3.zero; // No valid position found
         }
 
         #endregion

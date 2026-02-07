@@ -123,6 +123,9 @@ namespace Antymology.Terrain
             // Optimize, and normal calculation
             MeshUtility.Optimize(mesh);
             mesh.RecalculateNormals();
+
+            // Assign the mesh to the collider
+            collider.sharedMesh = null;
             collider.sharedMesh = mesh;
         }
 
