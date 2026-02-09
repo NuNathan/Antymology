@@ -12,9 +12,14 @@ namespace Antymology.Terrain
         #region Fields
 
         /// <summary>
-        /// The prefab containing the ant.
+        /// The prefab containing the worker ant.
         /// </summary>
         public GameObject antPrefab;
+
+        /// <summary>
+        /// The prefab containing the queen ant.
+        /// </summary>
+        public GameObject queenAntPrefab;
 
         /// <summary>
         /// The material used for eech block.
@@ -96,9 +101,16 @@ namespace Antymology.Terrain
 
             if (spawnPosition != Vector3.zero)
             {
-                // Instantiate the ant at the spawn position
+                // Instantiate the worker ant at the spawn position
                 GameObject ant = Instantiate(antPrefab, spawnPosition, Quaternion.identity);
                 ant.transform.position = spawnPosition;
+
+                // Instantiate the queen ant at the same spawn position
+                if (queenAntPrefab != null)
+                {
+                    GameObject queen = Instantiate(queenAntPrefab, spawnPosition, Quaternion.identity);
+                    queen.transform.position = spawnPosition;
+                }
             }
         }
 
@@ -131,6 +143,18 @@ namespace Antymology.Terrain
 
         #endregion
 
+        #region Pheromone Update
+
+        /// <summary>
+        /// Each physics tick, let active air blocks handle their own evaporation and diffusion.
+        /// </summary>
+        private void FixedUpdate()
+        {
+            AirBlock.TickAll();
+        }
+
+        #endregion
+
         #region Methods
 
         /// <summary>
@@ -148,6 +172,26 @@ namespace Antymology.Terrain
                 WorldZCoordinate >= Blocks.GetLength(2)
             )
                 return new AirBlock();
+
+            return Blocks[WorldXCoordinate, WorldYCoordinate, WorldZCoordinate];
+        }
+
+        /// <summary>
+        /// Retrieves a block at the desired world coordinates, or null if out of bounds.
+        /// Used by AirBlock.TickAll to avoid creating temporary blocks.
+        /// </summary>
+        public AbstractBlock GetBlockOrNull(int WorldXCoordinate, int WorldYCoordinate, int WorldZCoordinate)
+        {
+            if
+            (
+                WorldXCoordinate < 0 ||
+                WorldYCoordinate < 0 ||
+                WorldZCoordinate < 0 ||
+                WorldXCoordinate >= Blocks.GetLength(0) ||
+                WorldYCoordinate >= Blocks.GetLength(1) ||
+                WorldZCoordinate >= Blocks.GetLength(2)
+            )
+                return null;
 
             return Blocks[WorldXCoordinate, WorldYCoordinate, WorldZCoordinate];
         }
@@ -203,6 +247,9 @@ namespace Antymology.Terrain
                 return;
             }
 
+            toSet.worldXCoordinate = WorldXCoordinate;
+            toSet.worldYCoordinate = WorldYCoordinate;
+            toSet.worldZCoordinate = WorldZCoordinate;
             Blocks[WorldXCoordinate, WorldYCoordinate, WorldZCoordinate] = toSet;
 
             SetChunkContainingBlockToUpdate
@@ -255,6 +302,20 @@ namespace Antymology.Terrain
             );
         }
 
+        /// <summary>
+        /// Counts the total number of NestBlocks in the world.
+        /// </summary>
+        public int CountNestBlocks()
+        {
+            int count = 0;
+            for (int x = 0; x < Blocks.GetLength(0); x++)
+                for (int y = 0; y < Blocks.GetLength(1); y++)
+                    for (int z = 0; z < Blocks.GetLength(2); z++)
+                        if (Blocks[x, y, z] is NestBlock)
+                            count++;
+            return count;
+        }
+
         #endregion
 
         #region Helpers
@@ -269,6 +330,22 @@ namespace Antymology.Terrain
             GeneratePreliminaryWorld();
             GenerateAcidicRegions();
             GenerateSphericalContainers();
+            AssignBlockCoordinates();
+        }
+
+        /// <summary>
+        /// Sets the world coordinates on every block after generation is complete.
+        /// </summary>
+        private void AssignBlockCoordinates()
+        {
+            for (int x = 0; x < Blocks.GetLength(0); x++)
+                for (int y = 0; y < Blocks.GetLength(1); y++)
+                    for (int z = 0; z < Blocks.GetLength(2); z++)
+                    {
+                        Blocks[x, y, z].worldXCoordinate = x;
+                        Blocks[x, y, z].worldYCoordinate = y;
+                        Blocks[x, y, z].worldZCoordinate = z;
+                    }
         }
 
         /// <summary>

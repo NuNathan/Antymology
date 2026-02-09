@@ -417,6 +417,7 @@ GameObject:
   - component: {fileID: 964896558}
   - component: {fileID: 964896557}
   - component: {fileID: 964896559}
+  - component: {fileID: 964896560}
   m_Layer: 0
   m_Name: WorldManager
   m_TagString: Untagged
@@ -438,7 +439,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   antPrefab: {fileID: 3981059259890540351, guid: 1fb87641e659d0d4298f642cc7e9ea3e,
     type: 3}
+  queenAntPrefab: {fileID: 4092170370901651462, guid: 011250a5ab58bbe41a61a8876e81b653,
+    type: 3}
   blockMaterial: {fileID: 2100000, guid: 4db9d8fce1a69b74f81daf1375c9ed88, type: 2}
+  queenPheromoneEvaporationRate: 0.001
+  queenPheromoneDiffusionRate: 0.01
 --- !u!4 &964896558
 Transform:
   m_ObjectHideFlags: 0
@@ -475,6 +480,18 @@ MonoBehaviour:
   Acidic_Region_Radius: 5
   Number_Of_Conatiner_Spheres: 5
   Conatiner_Sphere_Radius: 10
+--- !u!114 &964896560
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 964896556}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2065a0a916f10c345970e70ccac31eb3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NestCountUI
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
