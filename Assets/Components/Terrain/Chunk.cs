@@ -124,9 +124,10 @@ namespace Antymology.Terrain
             MeshUtility.Optimize(mesh);
             mesh.RecalculateNormals();
 
-            // Assign the mesh to the collider
+            // Assign the mesh to the collider - prevents issues when restarting the simulation
             collider.sharedMesh = null;
-            collider.sharedMesh = mesh;
+            if (vertices.Count > 0)
+                collider.sharedMesh = mesh;
         }
 
         #endregion

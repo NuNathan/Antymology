@@ -85,31 +85,62 @@ namespace Antymology.Terrain
             Camera.main.transform.position = new Vector3(0 / 2, Blocks.GetLength(1), 0);
             Camera.main.transform.LookAt(new Vector3(Blocks.GetLength(0), 0, Blocks.GetLength(2)));
 
+            // bootstrap EvolutionManager singleton (auto-creates via Singleton<T>)
+            var _ = EvolutionManager.Instance;
+
+            // bootstrap generation counter UI
+            GameObject genUIObj = new GameObject("GenerationUI");
+            genUIObj.AddComponent<GenerationUI>();
+
             GenerateAnts();
         }
 
         /// <summary>
         /// Generates ants in the world at a valid spawn position.
+        /// Spawns the queen first, then 20 worker ants within a 5-block radius of the queen.
         /// </summary>
         private void GenerateAnts()
         {
-            if (antPrefab == null)
-                return;
-
             // Find a valid spawn position (on top of a solid block)
             Vector3 spawnPosition = FindValidSpawnPosition();
 
-            if (spawnPosition != Vector3.zero)
-            {
-                // Instantiate the worker ant at the spawn position
-                GameObject ant = Instantiate(antPrefab, spawnPosition, Quaternion.identity);
-                ant.transform.position = spawnPosition;
+            if (spawnPosition == Vector3.zero)
+                return;
 
-                // Instantiate the queen ant at the same spawn position
-                if (queenAntPrefab != null)
+            // Instantiate the queen ant at the spawn position
+            if (queenAntPrefab != null)
+            {
+                GameObject queen = Instantiate(queenAntPrefab, spawnPosition, Quaternion.identity);
+                queen.transform.position = spawnPosition;
+            }
+
+            // Spawn 20 worker ants within a 5-block radius of the queen
+            if (antPrefab != null)
+            {
+                int workerCount = 20;
+                float spawnRadius = 5f;
+
+                for (int i = 0; i < workerCount; i++)
                 {
-                    GameObject queen = Instantiate(queenAntPrefab, spawnPosition, Quaternion.identity);
-                    queen.transform.position = spawnPosition;
+                    // random offset within a circle of radius 5
+                    float angle = UnityEngine.Random.Range(0f, 360f);
+                    float distance = UnityEngine.Random.Range(0f, spawnRadius);
+                    float offsetX = Mathf.Cos(angle * Mathf.Deg2Rad) * distance;
+                    float offsetZ = Mathf.Sin(angle * Mathf.Deg2Rad) * distance;
+
+                    // spawn high above the terrain so the raycast snap-to-ground
+                    // in AntBase handles placing them on the surface correctly
+                    Vector3 workerPos = new Vector3(
+                        spawnPosition.x + offsetX,
+                        spawnPosition.y + 10f,
+                        spawnPosition.z + offsetZ);
+
+                    // random facing direction (AntBase.Start also randomizes, but set rotation for visual)
+                    float facingAngle = UnityEngine.Random.Range(0f, 360f);
+                    Quaternion rotation = Quaternion.Euler(0f, facingAngle, 0f);
+
+                    GameObject ant = Instantiate(antPrefab, workerPos, rotation);
+                    ant.transform.position = workerPos;
                 }
             }
         }
@@ -117,7 +148,7 @@ namespace Antymology.Terrain
         /// <summary>
         /// Finds a valid spawn position on top of a solid block.
         /// </summary>
-        private Vector3 FindValidSpawnPosition()
+        public Vector3 FindValidSpawnPosition()
         {
             // Try to find a solid block near the center of the world
             int centerX = Blocks.GetLength(0) / 2;
@@ -141,6 +172,25 @@ namespace Antymology.Terrain
             return Vector3.zero; // No valid position found
         }
 
+        /// <summary>
+        /// Resets the world for a new generation: clears pheromone tracking,
+        /// regenerates all block data, and flags every chunk to rebuild its mesh.
+        /// </summary>
+        public void ResetWorld()
+        {
+            // Clear static pheromone tracking so stale AirBlock refs are discarded
+            AirBlock.ClearAll();
+
+            // Regenerate all block data from scratch
+            GenerateData();
+
+            // Flag every chunk to rebuild its mesh in the next LateUpdate
+            for (int x = 0; x < Chunks.GetLength(0); x++)
+                for (int y = 0; y < Chunks.GetLength(1); y++)
+                    for (int z = 0; z < Chunks.GetLength(2); z++)
+                        Chunks[x, y, z].updateNeeded = true;
+        }
+
         #endregion
 
         #region Pheromone Update
@@ -148,7 +198,7 @@ namespace Antymology.Terrain
         /// <summary>
         /// Each physics tick, let active air blocks handle their own evaporation and diffusion.
         /// </summary>
-        private void FixedUpdate()
+        private void Update()
         {
             AirBlock.TickAll();
         }
@@ -164,6 +214,7 @@ namespace Antymology.Terrain
         {
             if
             (
+                Blocks == null ||
                 WorldXCoordinate < 0 ||
                 WorldYCoordinate < 0 ||
                 WorldZCoordinate < 0 ||
@@ -184,6 +235,7 @@ namespace Antymology.Terrain
         {
             if
             (
+                Blocks == null ||
                 WorldXCoordinate < 0 ||
                 WorldYCoordinate < 0 ||
                 WorldZCoordinate < 0 ||
@@ -235,6 +287,7 @@ namespace Antymology.Terrain
         {
             if
             (
+                Blocks == null ||
                 WorldXCoordinate < 0 ||
                 WorldYCoordinate < 0 ||
                 WorldZCoordinate < 0 ||
@@ -307,6 +360,7 @@ namespace Antymology.Terrain
         /// </summary>
         public int CountNestBlocks()
         {
+            if (Blocks == null) return 0;
             int count = 0;
             for (int x = 0; x < Blocks.GetLength(0); x++)
                 for (int y = 0; y < Blocks.GetLength(1); y++)
