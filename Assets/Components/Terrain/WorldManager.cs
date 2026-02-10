@@ -85,7 +85,6 @@ namespace Antymology.Terrain
             Camera.main.transform.position = new Vector3(0 / 2, Blocks.GetLength(1), 0);
             Camera.main.transform.LookAt(new Vector3(Blocks.GetLength(0), 0, Blocks.GetLength(2)));
 
-            // bootstrap EvolutionManager singleton (auto-creates via Singleton<T>)
             var _ = EvolutionManager.Instance;
 
             // bootstrap generation counter UI
@@ -96,8 +95,8 @@ namespace Antymology.Terrain
         }
 
         /// <summary>
-        /// Generates ants in the world at a valid spawn position.
-        /// Spawns the queen first, then 20 worker ants within a 5-block radius of the queen.
+        /// Generates ants in the world at a valid spawn position
+        /// spawns the queen first, then 20 worker ants within a 5-block radius of the queen
         /// </summary>
         private void GenerateAnts()
         {
@@ -146,7 +145,7 @@ namespace Antymology.Terrain
         }
 
         /// <summary>
-        /// Finds a valid spawn position on top of a solid block.
+        /// Finds a valid spawn position on top of a solid block
         /// </summary>
         public Vector3 FindValidSpawnPosition()
         {
@@ -173,8 +172,8 @@ namespace Antymology.Terrain
         }
 
         /// <summary>
-        /// Resets the world for a new generation: clears pheromone tracking,
-        /// regenerates all block data, and flags every chunk to rebuild its mesh.
+        /// Resets the world for a new generation: clears pheromone tracking
+        /// regenerates all block data, and flags every chunk to rebuild its mesh
         /// </summary>
         public void ResetWorld()
         {
@@ -196,7 +195,7 @@ namespace Antymology.Terrain
         #region Pheromone Update
 
         /// <summary>
-        /// Each physics tick, let active air blocks handle their own evaporation and diffusion.
+        /// Each physics tick, let active air blocks handle their own evaporation and diffusion
         /// </summary>
         private void Update()
         {
@@ -228,8 +227,8 @@ namespace Antymology.Terrain
         }
 
         /// <summary>
-        /// Retrieves a block at the desired world coordinates, or null if out of bounds.
-        /// Used by AirBlock.TickAll to avoid creating temporary blocks.
+        /// Retrieves a block at the desired world coordinates, or null if out of bounds
+        /// Used by AirBlock.TickAll to avoid creating temporary blocks
         /// </summary>
         public AbstractBlock GetBlockOrNull(int WorldXCoordinate, int WorldYCoordinate, int WorldZCoordinate)
         {
@@ -356,7 +355,7 @@ namespace Antymology.Terrain
         }
 
         /// <summary>
-        /// Counts the total number of NestBlocks in the world.
+        /// Counts the total number of NestBlocks in the world
         /// </summary>
         public int CountNestBlocks()
         {

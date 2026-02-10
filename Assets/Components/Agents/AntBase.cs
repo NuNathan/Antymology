@@ -106,7 +106,6 @@ public abstract class AntBase : MonoBehaviour
     #region Movement
 
     // Randomly turns the ant within a set range, then moves forward in that new direction
-    // If the move is blocked, pick a random new direction and try again
     protected void TryMove()
     {
         if (!isGrounded)
@@ -208,8 +207,8 @@ public abstract class AntBase : MonoBehaviour
 
     #region Utility
 
-    // Checks if another ant is close enough to be considered "on" the given block.
-    // Uses a proximity check: within 1 block horizontally and 2 blocks vertically of the block center.
+    // Checks if another ant is close enough to be considered "on" the given block
+    // Uses a proximity check where within 1 block horizontally and 2 blocks vertically of the block center
     protected bool IsAntOnBlock(int blockX, int blockY, int blockZ)
     {
         float centerX = blockX + 0.5f;

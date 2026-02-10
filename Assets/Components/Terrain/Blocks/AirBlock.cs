@@ -27,6 +27,9 @@ namespace Antymology.Terrain
 
         #region Fields
 
+        /// <summary>
+        /// Statically held is visible.
+        /// </summary>
         private static bool _isVisible = false;
         private static HashSet<AirBlock> activeBlocks = new HashSet<AirBlock>();
         private static List<AirBlock> tickBuffer = new List<AirBlock>();
@@ -109,7 +112,7 @@ namespace Antymology.Terrain
         }
 
         /// <summary>
-        /// Air blocks are invisible so asking for their tile map coordinate is invalid.
+        /// Air blocks are invisible so asking for their tile map coordinate doesn't make sense.
         /// </summary>
         public override Vector2 tileMapCoordinate()
         {
@@ -178,6 +181,7 @@ namespace Antymology.Terrain
         /// <summary>
         /// Diffuses both queen and worker pheromone to neighbouring air blocks.
         /// </summary>
+        /// <param name="neighbours"></param>
         public void Diffuse(AbstractBlock[] neighbours)
         {
             double queenCurrent = QueenPheromone;

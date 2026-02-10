@@ -3,54 +3,44 @@ using System.Collections.Generic;
 using System.Linq;
 using Antymology.Terrain;
 
-// Manages generational cycling, breeding pools, crossover, and mutation for both queens and workers.
-// Generation advances when the queen dies. New queen + workers are spawned with evolved genes.
 public class EvolutionManager : Singleton<EvolutionManager>
 {
-    // current generation number (starts at 1)
     private int generation = 1;
     public int Generation => generation;
 
-    // best nest count across all queens ever
     private int bestNestCount = 0;
     public int BestNestCount => bestNestCount;
 
-    // --- Queen breeding pool: top 5 queens of all time ---
+    // queen breeding pool: top queens of all time
     private List<QueenGenes> topQueens = new List<QueenGenes>();
     private const int MAX_TOP_QUEENS = 5;
 
-    // --- Worker breeding pool: top 20 of all time + 10 random from last generation ---
+    // worker breeding pool: top all-time + random from last generation
     private List<WorkerGenes> topWorkers = new List<WorkerGenes>();
     private const int MAX_TOP_WORKERS = 20;
     private List<WorkerGenes> lastGenWorkers = new List<WorkerGenes>();
     private const int RANDOM_FROM_LAST_GEN = 10;
-    private const int ELITE_CARRY_OVER = 5; // top 5 workers carried over unchanged
+    private const int ELITE_CARRY_OVER = 5;
 
-    // mutation rates
-    private const float RULESET_MUTATION_RATE = 0.05f; // 5% of rules mutated
-    private const int THRESHOLD_MUTATION_RANGE = AntBase.MAX_HEALTH / 20; // +/- 5% of max health
-
-    // tournament selection size
+    // evolution parameters
+    private const float RULESET_MUTATION_RATE = 0.05f;
+    private const int THRESHOLD_MUTATION_RANGE = AntBase.MAX_HEALTH / 20;
     private const int TOURNAMENT_SIZE = 3;
-
-    // weight for mulch eaten in worker composite fitness
     private const int MULCH_FITNESS_WEIGHT = 50;
 
-    // guard to prevent re-entrant death reporting during generational transition
     private bool isTransitioning = false;
 
     #region Gene Data Structures
 
     public struct QueenGenes
     {
-        public int fitness; // nestsPlaced
+        public int fitness;
         public int placeNestHealthThreshold;
-        public Dictionary<string, int> ruleset;
     }
 
     public struct WorkerGenes
     {
-        public int fitness; // composite: totalEnergyGiven + mulchEaten * MULCH_FITNESS_WEIGHT
+        public int fitness;
         public int feedQueenHealthThreshold;
         public Dictionary<string, int> ruleset;
     }
@@ -59,16 +49,15 @@ public class EvolutionManager : Singleton<EvolutionManager>
 
     #region Ant Death Reporting
 
-    // Called by AntBase.Die() before the ant is destroyed
+    /// <summary> Called by AntBase.Die(), queen death triggers a new generation </summary>
     public void ReportDeath(AntBase ant)
     {
-        if (isTransitioning) return; // ignore deaths during generational transition
+        if (isTransitioning) return;
 
         if (ant is QueenAnt queen)
         {
             isTransitioning = true;
             RecordQueen(queen);
-            // all current workers also need to be recorded before respawning
             RecordSurvivingWorkers();
             generation++;
             SpawnNextGeneration();
@@ -80,13 +69,13 @@ public class EvolutionManager : Singleton<EvolutionManager>
         }
     }
 
+    /// <summary> Saves queen genes into the top-queens breeding pool </summary>
     private void RecordQueen(QueenAnt queen)
     {
         QueenGenes genes = new QueenGenes
         {
             fitness = queen.NestsPlaced,
-            placeNestHealthThreshold = queen.PlaceNestHealthThreshold,
-            ruleset = new Dictionary<string, int>(queen.Ruleset)
+            placeNestHealthThreshold = queen.PlaceNestHealthThreshold
         };
 
         topQueens.Add(genes);
@@ -96,6 +85,7 @@ public class EvolutionManager : Singleton<EvolutionManager>
             bestNestCount = queen.NestsPlaced;
     }
 
+    /// <summary> Saves worker genes into both the last-gen and top-workers pools </summary>
     private void RecordWorker(WorkerAnt worker)
     {
         WorkerGenes genes = new WorkerGenes
@@ -105,14 +95,12 @@ public class EvolutionManager : Singleton<EvolutionManager>
             ruleset = new Dictionary<string, int>(worker.Ruleset)
         };
 
-        // add to last gen list (for random selection at end of generation)
         lastGenWorkers.Add(genes);
-
-        // maintain top 20 all-time
         topWorkers.Add(genes);
         topWorkers = topWorkers.OrderByDescending(w => w.fitness).Take(MAX_TOP_WORKERS).ToList();
     }
 
+    /// <summary> Records all still-living workers before the generation resets </summary>
     private void RecordSurvivingWorkers()
     {
         WorkerAnt[] livingWorkers = FindObjectsByType<WorkerAnt>(FindObjectsSortMode.None);
@@ -126,31 +114,24 @@ public class EvolutionManager : Singleton<EvolutionManager>
 
     #region Spawning Next Generation
 
+    /// <summary> Destroys remaining ants, resets the world, and spawns evolved queen + workers </summary>
     private void SpawnNextGeneration()
     {
-        // destroy all remaining workers
         WorkerAnt[] remaining = FindObjectsByType<WorkerAnt>(FindObjectsSortMode.None);
         foreach (WorkerAnt w in remaining)
             Destroy(w.gameObject);
 
-        // reset the world terrain for the new generation
         WorldManager.Instance.ResetWorld();
 
         Vector3 spawnPos = WorldManager.Instance.FindValidSpawnPosition();
         if (spawnPos == Vector3.zero) return;
 
-        // spawn evolved queen
         SpawnEvolvedQueen(spawnPos);
-
-        // spawn 20 evolved workers
         SpawnEvolvedWorkers(spawnPos, 20);
-
-        // reset last gen workers for the new generation
         lastGenWorkers.Clear();
     }
 
-
-
+    /// <summary> Spawns a queen with threshold evolved from the top-queens pool </summary>
     private void SpawnEvolvedQueen(Vector3 spawnPos)
     {
         GameObject queenPrefab = WorldManager.Instance.queenAntPrefab;
@@ -161,35 +142,26 @@ public class EvolutionManager : Singleton<EvolutionManager>
 
         if (topQueens.Count >= 2)
         {
-            // tournament selection with self-mating prevention
             int idx1 = TournamentSelectQueen(topQueens);
             int idx2 = TournamentSelectQueen(topQueens, idx1);
             QueenGenes parent1 = topQueens[idx1];
             QueenGenes parent2 = topQueens[idx2];
 
-            // crossover ruleset
-            Dictionary<string, int> childRuleset = CrossoverRuleset(parent1.ruleset, parent2.ruleset);
-            MutateRuleset(childRuleset);
-
-            // crossover threshold (average + small mutation, clamped 50%-90% of max health)
             int childThreshold = (parent1.placeNestHealthThreshold + parent2.placeNestHealthThreshold) / 2;
             childThreshold += Random.Range(-THRESHOLD_MUTATION_RANGE, THRESHOLD_MUTATION_RANGE + 1);
             childThreshold = Mathf.Clamp(childThreshold, AntBase.MAX_HEALTH / 2, AntBase.MAX_HEALTH * 9 / 10);
 
-            // inject genes before Start() runs
-            foreach (var kvp in childRuleset)
-                queen.Ruleset[kvp.Key] = kvp.Value;
             queen.PlaceNestHealthThreshold = childThreshold;
         }
-        // else: first generation, queen uses random genes from Start()
     }
 
+    /// <summary> Spawns workers with genes bred from the breeding pool, plus elite carry-overs </summary>
     private void SpawnEvolvedWorkers(Vector3 spawnPos, int count)
     {
         GameObject workerPrefab = WorldManager.Instance.antPrefab;
         if (workerPrefab == null) return;
 
-        // build breeding pool: top 20 all-time + 10 random from last gen
+        // breeding pool: top all-time + random sample from last generation
         List<WorkerGenes> breedingPool = new List<WorkerGenes>(topWorkers);
 
         if (lastGenWorkers.Count > 0)
@@ -201,7 +173,6 @@ public class EvolutionManager : Singleton<EvolutionManager>
 
         float spawnRadius = 5f;
 
-        // number of elite workers to carry over unchanged from top all-time
         int eliteCount = Mathf.Min(ELITE_CARRY_OVER, topWorkers.Count);
 
         for (int i = 0; i < count; i++)
@@ -224,7 +195,7 @@ public class EvolutionManager : Singleton<EvolutionManager>
 
             if (i < eliteCount)
             {
-                // carry over top performers unchanged
+                // elite carry-over: top performers injected unchanged
                 WorkerGenes elite = topWorkers[i];
                 foreach (var kvp in elite.ruleset)
                     worker.Ruleset[kvp.Key] = kvp.Value;
@@ -232,7 +203,6 @@ public class EvolutionManager : Singleton<EvolutionManager>
             }
             else if (breedingPool.Count >= 2)
             {
-                // tournament selection with self-mating prevention
                 int idx1 = TournamentSelectWorker(breedingPool);
                 int idx2 = TournamentSelectWorker(breedingPool, idx1);
                 WorkerGenes parent1 = breedingPool[idx1];
@@ -256,7 +226,7 @@ public class EvolutionManager : Singleton<EvolutionManager>
 
     #region Crossover and Mutation
 
-    // Uniform crossover: for each rule, randomly pick from parent1 or parent2
+    /// <summary> Uniform crossover: each rule randomly picked from one parent </summary>
     private Dictionary<string, int> CrossoverRuleset(
         Dictionary<string, int> parent1, Dictionary<string, int> parent2)
     {
@@ -270,7 +240,6 @@ public class EvolutionManager : Singleton<EvolutionManager>
                 child[kvp.Key] = kvp.Value;
         }
 
-        // add any keys only in parent2
         foreach (var kvp in parent2)
         {
             if (!child.ContainsKey(kvp.Key))
@@ -280,7 +249,7 @@ public class EvolutionManager : Singleton<EvolutionManager>
         return child;
     }
 
-    // Mutate a small percentage of rules to random actions
+    /// <summary> Randomly mutates a small percentage of rules to new actions </summary>
     private void MutateRuleset(Dictionary<string, int> ruleset)
     {
         List<string> keys = new List<string>(ruleset.Keys);
@@ -297,8 +266,7 @@ public class EvolutionManager : Singleton<EvolutionManager>
 
     #region Tournament Selection
 
-    // Tournament selection for queens: pick TOURNAMENT_SIZE random candidates, return index of fittest.
-    // If excludeIndex is provided (>= 0), that index is excluded to prevent self-mating.
+    /// <summary> Tournament selection for queens, re-rolls once on excludeIndex collision then wraps </summary>
     private int TournamentSelectQueen(List<QueenGenes> pool, int excludeIndex = -1)
     {
         int bestIndex = -1;
@@ -308,10 +276,8 @@ public class EvolutionManager : Singleton<EvolutionManager>
         {
             int candidate = Random.Range(0, pool.Count);
 
-            // skip the excluded index to prevent self-mating
             if (candidate == excludeIndex)
             {
-                // re-roll once; if pool is small this avoids infinite loops
                 candidate = Random.Range(0, pool.Count);
                 if (candidate == excludeIndex)
                     candidate = (candidate + 1) % pool.Count;
@@ -327,8 +293,7 @@ public class EvolutionManager : Singleton<EvolutionManager>
         return bestIndex;
     }
 
-    // Tournament selection for workers: pick TOURNAMENT_SIZE random candidates, return index of fittest.
-    // If excludeIndex is provided (>= 0), that index is excluded to prevent self-mating.
+    /// <summary> Tournament selection for workers, re-rolls once on excludeIndex collision then wraps </summary>
     private int TournamentSelectWorker(List<WorkerGenes> pool, int excludeIndex = -1)
     {
         int bestIndex = -1;
@@ -338,7 +303,6 @@ public class EvolutionManager : Singleton<EvolutionManager>
         {
             int candidate = Random.Range(0, pool.Count);
 
-            // skip the excluded index to prevent self-mating
             if (candidate == excludeIndex)
             {
                 candidate = Random.Range(0, pool.Count);

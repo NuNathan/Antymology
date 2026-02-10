@@ -1,9 +1,7 @@
 using UnityEngine;
-using System.Collections.Generic;
 using Antymology.Terrain;
 
 // Queen ant behavior, drops pheromone, places nest blocks, and wanders randomly
-// Uses neighbourhood ruleset when health < placeNestHealthThreshold
 public class QueenAnt : AntBase
 {
     [Header("Queen Pheromone")]
@@ -24,9 +22,6 @@ public class QueenAnt : AntBase
     private int nestsPlaced = 0;
     public int NestsPlaced => nestsPlaced;
 
-    // neighbourhood-based ruleset (same structure as WorkerAnt)
-    private Dictionary<string, int> ruleset = new Dictionary<string, int>();
-
     // public accessors for genes so EvolutionManager can read/write them
     public int PlaceNestHealthThreshold
     {
@@ -34,15 +29,10 @@ public class QueenAnt : AntBase
         set => placeNestHealthThreshold = Mathf.Clamp(value, MAX_HEALTH / 2, MAX_HEALTH * 9 / 10);
     }
 
-    public Dictionary<string, int> Ruleset => ruleset;
-
     protected override void Start()
     {
         base.Start();
         maxDropHeight = 2f; // queen won't drop more than 2 blocks
-        // only generate random ruleset if EvolutionManager hasn't injected one
-        if (ruleset.Count == 0)
-            InitializeRuleset();
         SetupQueenVisuals();
     }
 
@@ -66,11 +56,6 @@ public class QueenAnt : AntBase
         if (health >= placeNestHealthThreshold)
         {
             TryPlaceNest();
-        }
-        else
-        {
-            // when health is low, use neighbourhood ruleset
-            ExecuteNeighbourhoodAction();
         }
 
         // drop pheromone every tick
@@ -143,64 +128,5 @@ public class QueenAnt : AntBase
         }
     }
 
-    #region Neighbourhood Ruleset
-
-    // Pre-populates the ruleset with a random action for every possible 5-block combination.
-    private void InitializeRuleset()
-    {
-        int totalCombinations = WorkerAnt.TOTAL_RULES;
-        char[] pattern = new char[WorkerAnt.NEIGHBOURHOOD_SIZE];
-
-        for (int i = 0; i < totalCombinations; i++)
-        {
-            int value = i;
-            for (int pos = WorkerAnt.NEIGHBOURHOOD_SIZE - 1; pos >= 0; pos--)
-            {
-                pattern[pos] = (char)('0' + (value % WorkerAnt.NUM_BLOCK_TYPES));
-                value /= WorkerAnt.NUM_BLOCK_TYPES;
-            }
-
-            string key = new string(pattern);
-            ruleset[key] = Random.Range(0, 3); // 0 = do nothing, 1 = eat mulch, 2 = dig
-        }
-    }
-
-    // Reads the 5-block touching neighbourhood, looks up the pre-assigned action, and executes it.
-    // Queen no longer digs — all actions are effectively "do nothing".
-    private void ExecuteNeighbourhoodAction()
-    {
-        // neighbourhood ruleset is still maintained for evolution, but queen doesn't dig
-    }
-
-    // Encodes the 5 touching blocks into a string key for dictionary lookup.
-    private string EncodeNeighbourhood()
-    {
-        int centerX = Mathf.FloorToInt(transform.position.x);
-        int centerY = Mathf.FloorToInt(transform.position.y - 0.1f);
-        int centerZ = Mathf.FloorToInt(transform.position.z);
-
-        char[] encoded = new char[WorkerAnt.NEIGHBOURHOOD_SIZE];
-
-        encoded[0] = BlockToChar(WorldManager.Instance.GetBlock(centerX, centerY - 1, centerZ));
-        encoded[1] = BlockToChar(WorldManager.Instance.GetBlock(centerX - 1, centerY, centerZ));
-        encoded[2] = BlockToChar(WorldManager.Instance.GetBlock(centerX + 1, centerY, centerZ));
-        encoded[3] = BlockToChar(WorldManager.Instance.GetBlock(centerX, centerY, centerZ - 1));
-        encoded[4] = BlockToChar(WorldManager.Instance.GetBlock(centerX, centerY, centerZ + 1));
-
-        return new string(encoded);
-    }
-
-    private char BlockToChar(AbstractBlock block)
-    {
-        if (block is GrassBlock)     return '0';
-        if (block is StoneBlock)     return '1';
-        if (block is MulchBlock)     return '2';
-        if (block is AcidicBlock)    return '3';
-        if (block is ContainerBlock) return '4';
-        if (block is NestBlock)      return '5';
-        return '0';
-    }
-
-    #endregion
 }
 
